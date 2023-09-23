@@ -1,0 +1,42 @@
+# 单机版kafka
+version: '3.5'
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    # 初始化一写数据 写入kafka的数据，会被保存在容器的/tmp/logs目录下
+    command:
+      - 'sh'
+      - '-c'
+      - '/opt/bitnami/scripts/kafka/setup.sh && kafka-storage.sh format --config "$${KAFKA_CONF_FILE}" --cluster-id "lkorDA4qT6W1K_dk0LHvtg" --ignore-formatted  && /opt/bitnami/scripts/kafka/run.sh' # Kraft specific initialise
+    environment:
+      - ALLOW_PLAINTEXT_LISTENER=yes # 允许使用PLAINTEXT监听器，默认false，不建议在生产环境使用
+      - KAFKA_CFG_NODE_ID=1 # 节点id，必须唯一
+      - KAFKA_CFG_BROKER_ID=1 # broker.id，必须唯一
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093   # 集群地址
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT # 定义安全协议
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER # 指定供外部使用的控制类请求信息
+      - KAFKA_CFG_LOG_DIRS=/tmp/logs # 日志目录
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller # kafka角色，做broker，也要做controller
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,INTERNAL://0.0.0.0:9094 # 定义kafka服务端socket监听端口
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true # 是否允许自动创建主题
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://192.168.0.158:9092,INTERNAL://kafka:9094 # 定义外网访问地址（宿主机ip地址和端口）
+    ports:
+      - "0.0.0.0:9092:9092"
+    volumes:
+      - /home/data/kafka/docker:/bitnami/kafka
+      - /home/data/kafka/docker/config:/bitnami/kafka/config
+      - /home/data/kafka/docker/data:/bitnami/kafka/data
+      - /home/data/kafka/docker/logs:/bitnami/kafka/logs
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "9091:8080" # kafka-ui的Web端口
+    restart: "always"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "lkorDA4qT6W1K_dk0LHvtg" # 集群id
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9094 # 集群地址
+    depends_on:
+      - kafka
